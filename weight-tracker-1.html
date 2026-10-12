@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E7EEEC">
+<title>Weight log</title>
+<style>
+  :root{
+    --bg:#E7EEEC;
+    --panel:#F7FAF9;
+    --ink:#17262E;
+    --muted:#5F7078;
+    --line:#C9D6D3;
+    --accent:#17607C;
+    --good:#25774F;
+    --bad:#A8432F;
+    --radius:14px;
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45;
+       padding:max(16px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom))}
+  .app{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  h1,h2{margin:0;font-weight:700}
+  h1{font-size:1.15rem}
+  h2{font-size:1rem}
+  button,input{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+  .num{font-variant-numeric:tabular-nums}
+
+  header{display:flex;justify-content:space-between;align-items:center}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+  .seg button{border:0;background:transparent;padding:6px 14px;border-radius:999px;color:var(--muted);font-weight:600}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+  /* Hero */
+  .hero{padding:4px 2px 0}
+  .hero .label{color:var(--muted);font-weight:600}
+  .big{font-size:4.6rem;line-height:1;font-weight:800;letter-spacing:-0.03em;margin:2px 0 4px}
+  .big small{font-size:1.4rem;font-weight:700;letter-spacing:0;color:var(--muted);margin-left:6px}
+  .delta{font-weight:600}
+  .delta.good{color:var(--good)} .delta.bad{color:var(--bad)}
+
+  .ruler{position:relative;height:40px;margin-top:20px}
+  .ruler .ticks{position:absolute;inset:auto 0 0 0;height:20px;
+    background:
+      repeating-linear-gradient(90deg,var(--muted) 0 1.5px,transparent 1.5px 40px) bottom/100% 20px no-repeat,
+      repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 8px) bottom/100% 11px no-repeat;}
+  .ruler .fill{position:absolute;left:0;bottom:0;height:4px;background:var(--accent);border-radius:2px;transition:width .5s ease}
+  .ruler .needle{position:absolute;bottom:0;width:3px;height:40px;margin-left:-1.5px;background:var(--accent);border-radius:2px;transition:left .5s ease}
+  .ruler .needle::before{content:"";position:absolute;top:-4px;left:-4px;width:11px;height:11px;border-radius:50%;background:var(--accent)}
+  .ruler-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:.85rem;margin-top:6px}
+  .hint{color:var(--muted);margin:16px 0 0}
+
+  /* Panels */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .panel h2{margin-bottom:12px}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:.85rem;font-weight:600}
+  input{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink);font-size:1.05rem;width:100%;min-width:0}
+  .primary{grid-column:1/-1;background:var(--accent);color:#fff;border:0;border-radius:10px;padding:13px;font-weight:700;font-size:1.05rem}
+  .primary:active{transform:translateY(1px)}
+  .msg{grid-column:1/-1;min-height:1.3em;margin:0;font-size:.9rem;color:var(--muted)}
+  .msg.err{color:var(--bad)}
+
+  .chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .chart-head h2{margin:0}
+  .seg.small button{padding:4px 11px;font-size:.85rem}
+  #chart{display:block;width:100%;height:auto;touch-action:pan-y;user-select:none}
+  #chart .ax{fill:var(--muted);font-size:10.5px}
+  #chart .grid{stroke:var(--line);stroke-width:1}
+  .readout{min-height:1.5em;margin:6px 0 0;font-weight:600;font-size:.95rem}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:.8rem;margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{display:inline-block;width:16px;height:0;border-top:3px solid var(--accent)}
+  .legend i.dot{width:7px;height:7px;border:0;border-radius:50%;background:var(--muted);opacity:.6}
+  .legend i.dash{border-top:2px dashed var(--ink)}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{padding:0 2px}
+  .stat b{display:block;font-size:1.5rem;font-weight:800;letter-spacing:-0.02em}
+  .stat span{color:var(--muted);font-size:.85rem}
+
+  .goal-row{display:flex;gap:10px;align-items:flex-end}
+  .goal-row label{flex:1}
+  .goal-row button{background:var(--ink);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:700}
+
+  ul{list-style:none;margin:0;padding:0}
+  li.row{display:grid;grid-template-columns:1fr auto auto 36px;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  li.row:first-child{border-top:0}
+  .row .d{color:var(--muted)}
+  .row .w{font-weight:700}
+  .row .c{font-size:.85rem;min-width:3.5em;text-align:right;color:var(--muted)}
+  .row .c.good{color:var(--good)} .row .c.bad{color:var(--bad)}
+  .row .x{background:transparent;border:0;color:var(--muted);font-size:1.3rem;line-height:1;padding:6px;border-radius:8px}
+  .row .x:hover{color:var(--bad)}
+  .empty{color:var(--muted);margin:0}
+
+  .foot{display:flex;gap:10px;flex-wrap:wrap}
+  .ghost{background:transparent;border:1px solid var(--line);border-radius:10px;padding:9px 14px;color:var(--ink);font-weight:600}
+  .ghost.danger{color:var(--bad)}
+
+  @media (prefers-reduced-motion:reduce){
+    .ruler .fill,.ruler .needle{transition:none}
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Weight log</h1>
+    <div class="seg" role="group" aria-label="Units">
+      <button id="u-kg" aria-pressed="true">kg</button>
+      <button id="u-lb" aria-pressed="false">lb</button>
+    </div>
+  </header>
+
+  <section class="hero" aria-live="polite">
+    <div class="label">Current weight</div>
+    <div class="big num" id="cur">--</div>
+    <div class="delta" id="delta"></div>
+    <div id="rulerWrap"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Log a weigh-in</h2>
+    <form id="form" autocomplete="off">
+      <label>Date<input type="date" id="date" required></label>
+      <label>Weight (<span id="fu">kg</span>)<input type="number" id="w" inputmode="decimal" step="0.1" min="0" placeholder="0.0" required></label>
+      <button class="primary" type="submit">Save weigh-in</button>
+      <p class="msg" id="msg" role="status"></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="chart-head">
+      <h2>Trend</h2>
+      <div class="seg small" role="group" aria-label="Chart range">
+        <button data-r="30" aria-pressed="false">30d</button>
+        <button data-r="90" aria-pressed="true">90d</button>
+        <button data-r="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <svg id="chart" viewBox="0 0 360 220" role="img" aria-label="Weight over time"></svg>
+    <p class="readout num" id="readout"></p>
+    <div class="legend">
+      <span><i class="dot"></i>Weigh-in</span>
+      <span><i></i>7-day average</span>
+      <span><i class="dash"></i>Goal</span>
+    </div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="panel">
+    <h2>Goal weight</h2>
+    <div class="goal-row">
+      <label>Goal (<span id="gu">kg</span>)<input type="number" id="goal" inputmode="decimal" step="0.1" min="0" placeholder="0.0"></label>
+      <button id="saveGoal">Save goal</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>History</h2>
+    <ul id="list"></ul>
+    <p class="empty" id="empty">No weigh-ins yet. Log your first one above.</p>
+  </section>
+
+  <div class="foot">
+    <button class="ghost" id="export">Export CSV</button>
+    <button class="ghost danger" id="clear">Clear all data</button>
+  </div>
+</main>
+
+<script>
+(() => {
+  const KG_PER_LB = 1 / 2.20462;
+  const $ = id => document.getElementById(id);
+  let state = { unit: 'kg', goalKg: null, entries: [] };   // entries: {date:'YYYY-MM-DD', kg}
+  let range = '90';
+  let plot = [];
+
+  /* ---------- storage (persists inside Claude artifacts; in-memory elsewhere) ---------- */
+  const KEY = 'weight-log:v1';
+  async function load() {
+    let raw = null;
+    try {
+      if (window.storage) {
+        const r = await window.storage.get(KEY);
+        raw = r && r.value;
+      } else {
+        raw = window.localStorage.getItem(KEY);   // browser storage when opened outside Claude
+      }
+    } catch (e) { /* no saved data yet, or storage unavailable */ }
+    if (raw) {
+      try { state = Object.assign(state, JSON.parse(raw)); } catch (e) { /* ignore corrupt data */ }
+    }
+  }
+  async function save() {
+    const data = JSON.stringify(state);
+    try {
+      if (window.storage) await window.storage.set(KEY, data);
+      else window.localStorage.setItem(KEY, data);
+    } catch (e) { console.error('Save failed', e); }
+  }
+
+  /* ---------- helpers ---------- */
+  const toDisp = kg => state.unit === 'kg' ? kg : kg / KG_PER_LB;
+  const fromDisp = v => state.unit === 'kg' ? v : v * KG_PER_LB;
+  const f1 = v => v.toFixed(1);
+  const fmt = kg => f1(toDisp(kg));
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const toT = s => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+  const DAY = 864e5;
+  const label = (t, long) => new Date(t).toLocaleDateString(undefined,
+    long ? { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+  function sorted() {
+    return state.entries.map(e => ({ ...e, t: toT(e.date) })).sort((a, b) => a.t - b.t);
+  }
+  function withAvg() {
+    const s = sorted();
+    return s.map(e => {
+      const win = s.filter(x => x.t <= e.t && x.t > e.t - 7 * DAY);
+      return { ...e, avg: win.reduce((a, x) => a + x.kg, 0) / win.length };
+    });
+  }
+  // Is moving down the "good" direction?
+  function downIsGood() {
+    const s = sorted();
+    if (state.goalKg == null || !s.length) return true;
+    return state.goalKg <= s[0].kg;
+  }
+
+  /* ---------- render ---------- */
+  function renderHero() {
+    const s = sorted(), u = state.unit;
+    const cur = $('cur'), delta = $('delta'), wrap = $('rulerWrap');
+    if (!s.length) {
+      cur.innerHTML = '--';
+      delta.textContent = '';
+      delta.className = 'delta';
+      wrap.innerHTML = '<p class="hint">Log a weigh-in to get started.</p>';
+      return;
+    }
+    const first = s[0], last = s[s.length - 1];
+    cur.innerHTML = `${fmt(last.kg)}<small>${u}</small>`;
+
+    if (s.length > 1) {
+      const diff = toDisp(last.kg) - toDisp(first.kg);
+      const dir = diff < 0 ? 'down' : diff > 0 ? 'up' : 'unchanged';
+      const good = diff === 0 ? true : (diff < 0) === downIsGood();
+      delta.textContent = diff === 0 ? 'Unchanged since your first weigh-in'
+        : `${f1(Math.abs(diff))} ${u} ${dir} since your first weigh-in`;
+      delta.className = 'delta ' + (diff === 0 ? '' : good ? 'good' : 'bad');
+    } else {
+      delta.textContent = 'First weigh-in logged';
+      delta.className = 'delta';
+    }
+
+    if (state.goalKg == null) {
+      wrap.innerHTML = '<p class="hint">Set a goal weight below to see your progress.</p>';
+      return;
+    }
+    const span = first.kg - state.goalKg;
+    let p = span === 0 ? 1 : (first.kg - last.kg) / span;
+    p = Math.max(0, Math.min(1, p));
+    wrap.innerHTML = `
+      <div class="ruler" role="img" aria-label="${Math.round(p * 100)} percent of the way to your goal">
+        <div class="ticks"></div>
+        <div class="fill" style="width:${p * 100}%"></div>
+        <div class="needle" style="left:${p * 100}%"></div>
+      </div>
+      <div class="ruler-labels num"><span>Start ${fmt(first.kg)}</span><span>Goal ${fmt(state.goalKg)}</span></div>`;
+  }
+
+  function renderStats() {
+    const s = withAvg(), u = state.unit, el = $('stats');
+    if (!s.length) { el.innerHTML = ''; return; }
+    const first = s[0], last = s[s.length - 1];
+    const moved = toDisp(first.kg) - toDisp(last.kg);
+    const movedTxt = f1(Math.abs(moved));
+    const movedLbl = moved >= 0 ? `${u} down` : `${u} up`;
+    const togo = state.goalKg == null ? null : toDisp(last.kg) - toDisp(state.goalKg);
+    const togoTxt = togo == null ? '--' : f1(Math.abs(togo));
+    const togoLbl = togo == null ? 'to goal' : (togo === 0 ? 'goal reached' : `${u} to goal`);
+    el.innerHTML = `
+      <div class="stat"><b class="num">${movedTxt}</b><span>${movedLbl}</span></div>
+      <div class="stat"><b class="num">${togoTxt}</b><span>${togoLbl}</span></div>
+      <div class="stat"><b class="num">${fmt(last.avg)}</b><span>7-day avg</span></div>`;
+  }
+
+  function renderList() {
+    const s = sorted(), u = state.unit, ul = $('list');
+    $('empty').style.display = s.length ? 'none' : 'block';
+    const good = downIsGood();
+    ul.innerHTML = s.slice().reverse().map((e, i, arr) => {
+      const prev = arr[i + 1];
+      let c = '', cls = '';
+      if (prev) {
+        const d = toDisp(e.kg) - toDisp(prev.kg);
+        const r = Math.round(d * 10) / 10;
+        if (r !== 0) { c = (r > 0 ? '+' : '−') + f1(Math.abs(r)); cls = (r < 0) === good ? 'good' : 'bad'; }
+        else { c = '0.0'; }
+      }
+      return `<li class="row">
+        <span class="d">${label(e.t, true)}</span>
+        <span class="w num">${fmt(e.kg)} ${u}</span>
+        <span class="c num ${cls}">${c}</span>
+        <button class="x" data-date="${e.date}" aria-label="Delete weigh-in from ${label(e.t, true)}">×</button>
+      </li>`;
+    }).join('');
+  }
+
+  function renderChart() {
+    const svg = $('chart'), ro = $('readout');
+    const W = 360, H = 220, pl = 38, pr = 14, pt = 14, pb = 26;
+    const all = withAvg();
+    plot = [];
+    if (all.length < 2) {
+      svg.innerHTML = `<text x="180" y="112" text-anchor="middle" class="ax" style="font-size:13px">Log two weigh-ins to see your trend</text>`;
+      ro.textContent = '';
+      return;
+    }
+    const lastT = all[all.length - 1].t;
+    const days = range === 'all' ? Infinity : +range;
+    let d = all.filter(e => e.t >= lastT - days * DAY);
+    if (d.length < 2) d = all.slice(-2);
+
+    const vals = d.flatMap(e => [toDisp(e.kg), toDisp(e.avg)]);
+    if (state.goalKg != null) vals.push(toDisp(state.goalKg));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const padV = Math.max((hi - lo) * 0.12, 0.4);
+    lo -= padV; hi += padV;
+
+    const t0 = d[0].t, t1 = d[d.length - 1].t;
+    const X = t => pl + ((t - t0) / (t1 - t0)) * (W - pl - pr);
+    const Y = v => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+
+    // ticks
+    const steps = [0.5, 1, 2, 5, 10, 20];
+    const step = steps.find(s => (hi - lo) / s <= 5) || 50;
+    let out = '';
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      out += `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}"/>
+              <text class="ax num" x="${pl - 6}" y="${Y(v) + 3.5}" text-anchor="end">${step < 1 ? v.toFixed(1) : Math.round(v)}</text>`;
+    }
+    out += `<text class="ax" x="${pl}" y="${H - 6}" text-anchor="start">${label(t0)}</text>
+            <text class="ax" x="${W - pr}" y="${H - 6}" text-anchor="end">${label(t1)}</text>`;
+
+    // goal line
+    if (state.goalKg != null) {
+      const gy = Y(toDisp(state.goalKg));
+      out += `<line x1="${pl}" x2="${W - pr}" y1="${gy}" y2="${gy}" stroke="#17262E" stroke-width="1.5" stroke-dasharray="5 4"/>
+              <text class="ax" x="${W - pr}" y="${gy - 5}" text-anchor="end" style="fill:#17262E;font-weight:700">Goal ${f1(toDisp(state.goalKg))}</text>`;
+    }
+
+    // average line, then points
+    const avgPath = d.map((e, i) => `${i ? 'L' : 'M'}${X(e.t).toFixed(1)},${Y(toDisp(e.avg)).toFixed(1)}`).join(' ');
+    out += `<path d="${avgPath}" fill="none" stroke="#17607C" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+    out += d.map(e => `<circle cx="${X(e.t).toFixed(1)}" cy="${Y(toDisp(e.kg)).toFixed(1)}" r="2.8" fill="#5F7078" fill-opacity=".65"/>`).join('');
+    out += `<g id="hl" visibility="hidden">
+              <line id="hlLine" y1="${pt}" y2="${H - pb}" stroke="#17262E" stroke-opacity=".25"/>
+              <circle id="hlDot" r="5.5" fill="#fff" stroke="#17262E" stroke-width="2"/>
+            </g>`;
+    svg.innerHTML = out;
+
+    plot = d.map(e => ({ x: X(e.t), y: Y(toDisp(e.kg)), e }));
+    showReadout(plot[plot.length - 1], false);
+  }
+
+  function showReadout(p, highlight) {
+    if (!p) return;
+    const u = state.unit;
+    $('readout').textContent = `${label(p.e.t, true)}: ${fmt(p.e.kg)} ${u}, 7-day avg ${fmt(p.e.avg)}`;
+    const hl = document.getElementById('hl');
+    if (!hl) return;
+    if (highlight) {
+      hl.setAttribute('visibility', 'visible');
+      document.getElementById('hlLine').setAttribute('x1', p.x);
+      document.getElementById('hlLine').setAttribute('x2', p.x);
+      document.getElementById('hlDot').setAttribute('cx', p.x);
+      document.getElementById('hlDot').setAttribute('cy', p.y);
+    } else hl.setAttribute('visibility', 'hidden');
+  }
+
+  function renderUnits() {
+    $('u-kg').setAttribute('aria-pressed', state.unit === 'kg');
+    $('u-lb').setAttribute('aria-pressed', state.unit === 'lb');
+    $('fu').textContent = $('gu').textContent = state.unit;
+    $('goal').value = state.goalKg == null ? '' : f1(toDisp(state.goalKg));
+  }
+
+  function renderAll() {
+    renderUnits(); renderHero(); renderChart(); renderStats(); renderList();
+  }
+
+  /* ---------- events ---------- */
+  function say(text, err) {
+    const m = $('msg');
+    m.textContent = text;
+    m.className = 'msg' + (err ? ' err' : '');
+  }
+
+  $('form').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const date = $('date').value;
+    const v = parseFloat($('w').value);
+    const kg = fromDisp(v);
+    if (!date || !isFinite(v) || kg < 20 || kg > 500) {
+      say(`Enter a weight between ${state.unit === 'kg' ? '20 and 500 kg' : '45 and 1100 lb'}.`, true);
+      return;
+    }
+    const i = state.entries.findIndex(e => e.date === date);
+    if (i >= 0) { state.entries[i].kg = kg; say(`Updated ${label(toT(date), true)}.`); }
+    else { state.entries.push({ date, kg }); say(`Saved ${label(toT(date), true)}.`); }
+    $('w').value = '';
+    renderAll();
+    await save();
+  });
+
+  $('u-kg').onclick = async () => { state.unit = 'kg'; renderAll(); await save(); };
+  $('u-lb').onclick = async () => { state.unit = 'lb'; renderAll(); await save(); };
+
+  document.querySelectorAll('[data-r]').forEach(b => b.addEventListener('click', () => {
+    range = b.dataset.r;
+    document.querySelectorAll('[data-r]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderChart();
+  }));
+
+  $('saveGoal').onclick = async () => {
+    const raw = $('goal').value.trim();
+    if (raw === '') { state.goalKg = null; }
+    else {
+      const kg = fromDisp(parseFloat(raw));
+      if (!isFinite(kg) || kg < 20 || kg > 500) { $('goal').focus(); return; }
+      state.goalKg = kg;
+    }
+    renderAll();
+    await save();
+  };
+
+  $('list').addEventListener('click', async ev => {
+    const b = ev.target.closest('.x');
+    if (!b) return;
+    state.entries = state.entries.filter(e => e.date !== b.dataset.date);
+    renderAll();
+    await save();
+  });
+
+  const svg = $('chart');
+  function nearest(ev) {
+    if (!plot.length) return;
+    const r = svg.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * (360 / r.width);
+    let best = plot[0];
+    for (const p of plot) if (Math.abs(p.x - x) < Math.abs(best.x - x)) best = p;
+    showReadout(best, true);
+  }
+  svg.addEventListener('pointermove', nearest);
+  svg.addEventListener('pointerdown', nearest);
+  svg.addEventListener('pointerleave', () => showReadout(plot[plot.length - 1], false));
+
+  $('export').onclick = () => {
+    const rows = ['date,weight_kg,weight_lb'].concat(sorted().map(e =>
+      `${e.date},${e.kg.toFixed(2)},${(e.kg / KG_PER_LB).toFixed(2)}`));
+    const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'weight-log.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  let armed = null;
+  $('clear').onclick = async () => {
+    const b = $('clear');
+    if (!armed) {
+      b.textContent = 'Tap again to delete everything';
+      armed = setTimeout(() => { armed = null; b.textContent = 'Clear all data'; }, 4000);
+      return;
+    }
+    clearTimeout(armed); armed = null;
+    b.textContent = 'Clear all data';
+    state.entries = []; state.goalKg = null;
+    renderAll();
+    await save();
+  };
+
+  /* ---------- start ---------- */
+  (async () => {
+    $('date').value = todayStr();
+    $('date').max = todayStr();
+    await load();
+    renderAll();
+  })();
+})();
+</script>
+</body>
+</html>
